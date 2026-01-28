@@ -1,9 +1,7 @@
 import Agenda, { Job } from "agenda";
 import { getMongoConnectionString } from "./config/database";
-import { cleanupDeletedNotesJob, CLEANUP_DELETED_NOTES_JOB } from "./jobs/cleanupDeletedNotes";
-
-// Job frequency configuration - update this value to change how often the cleanup job runs
-export const CLEANUP_JOB_FREQUENCY = "30 seconds";
+import { cleanupDeletedNotesJob } from "./jobs/cleanupDeletedNotes";
+import { CLEANUP_DELETED_NOTES_JOB, CLEANUP_JOB_FREQUENCY } from "./variables";
 
 let agenda: Agenda;
 

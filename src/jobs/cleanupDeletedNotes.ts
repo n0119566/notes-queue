@@ -1,5 +1,6 @@
 import { Job } from "agenda";
 import Note from "../models/Note";
+import { MAX_DELETION_DAYS } from "../variables";
 
 /**
  * Job: cleanup-deleted-notes
@@ -15,21 +16,22 @@ export const cleanupDeletedNotesJob = async (job: Job): Promise<void> => {
   try {
     // Calculate the date 30 days ago
     const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - MAX_DELETION_DAYS);
 
     // Find and delete notes that are marked as deleted and older than 30 days
     const result = await Note.deleteMany({
       deleted: true,
-      deletedDate: { $lt: thirtyDaysAgo },
+      $or: [
+        { deletedDate: { $lt: thirtyDaysAgo } }, // If date is greater than 30 days ago
+        { deletedDate: { $exists: false } }, // OR if the field is missing entirely
+      ],
     });
 
     console.log(
-      `✅ [${jobName}] Permanently deleted ${result.deletedCount} notes that were in trash for over 30 days`,
+      `✅ [${jobName}] Permanently deleted ${result.deletedCount} notes that were in trash for over ${MAX_DELETION_DAYS} days`,
     );
   } catch (error) {
     console.error(`❌ [${jobName}] Error cleaning up deleted notes:`, error);
     throw error;
   }
 };
-
-export const CLEANUP_DELETED_NOTES_JOB = "cleanup-deleted-notes";
