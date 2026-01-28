@@ -20,7 +20,6 @@ export const initAgenda = async (): Promise<Agenda> => {
 
   agenda.define(CLEANUP_DELETED_NOTES_JOB, async (job: Job) => {
     try {
-      console.log("Checking status of searches and updating...");
       await cleanupDeletedNotesJob(job);
     } catch (error) {
       console.error("Error in check and update job:", error);
@@ -30,9 +29,6 @@ export const initAgenda = async (): Promise<Agenda> => {
   // Event listeners for monitoring
   agenda.on("ready", async () => {
     console.log("📅 Agenda is ready");
-    await agenda.every(CLEANUP_JOB_FREQUENCY, CLEANUP_DELETED_NOTES_JOB);
-    console.log(`⏰ Scheduled ${CLEANUP_DELETED_NOTES_JOB} to run every ${CLEANUP_JOB_FREQUENCY}`);
-    await agenda.schedule("in 1 minutes", [CLEANUP_DELETED_NOTES_JOB], {});
   });
 
   agenda.on("start", async (job) => {
@@ -57,6 +53,9 @@ export const startAgenda = async (): Promise<void> => {
 
   await agenda.start();
   console.log("🚀 Agenda started");
+
+  await agenda.every(CLEANUP_JOB_FREQUENCY, CLEANUP_DELETED_NOTES_JOB);
+  console.log(`⏰ Scheduled ${CLEANUP_DELETED_NOTES_JOB} to run every ${CLEANUP_JOB_FREQUENCY}`);
 };
 
 export const stopAgenda = async (): Promise<void> => {
