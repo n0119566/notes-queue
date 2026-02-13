@@ -1,7 +1,8 @@
 import Agenda, { Job } from "agenda";
 import { getMongoConnectionString } from "./config/database";
 import { cleanupDeletedNotesJob } from "./jobs/cleanupDeletedNotes";
-import { CLEANUP_DELETED_NOTES_JOB, CLEANUP_JOB_FREQUENCY } from "./variables";
+import { CLEANUP_DELETED_NOTES_JOB, CLEANUP_EXPIRED_NOTES_JOB, CLEANUP_JOB_FREQUENCY } from "./variables";
+import { cleanupExpiredNotesJob } from "./jobs/cleanupExpiredNotes";
 
 let agenda: Agenda;
 
@@ -19,6 +20,14 @@ export const initAgenda = async (): Promise<Agenda> => {
   agenda.define(CLEANUP_DELETED_NOTES_JOB, async (job: Job) => {
     try {
       await cleanupDeletedNotesJob(job);
+    } catch (error) {
+      console.error("Error in check and update job:", error);
+    }
+  });
+
+  agenda.define(CLEANUP_EXPIRED_NOTES_JOB, async (job: Job) => {
+    try {
+      await cleanupExpiredNotesJob(job);
     } catch (error) {
       console.error("Error in check and update job:", error);
     }
@@ -54,6 +63,9 @@ export const startAgenda = async (): Promise<void> => {
 
   await agenda.every(CLEANUP_JOB_FREQUENCY, CLEANUP_DELETED_NOTES_JOB);
   console.log(`⏰ Scheduled ${CLEANUP_DELETED_NOTES_JOB} to run every ${CLEANUP_JOB_FREQUENCY}`);
+
+  await agenda.every(CLEANUP_JOB_FREQUENCY, CLEANUP_EXPIRED_NOTES_JOB);
+  console.log(`⏰ Scheduled ${CLEANUP_EXPIRED_NOTES_JOB} to run every ${CLEANUP_JOB_FREQUENCY}`);
 };
 
 export const stopAgenda = async (): Promise<void> => {

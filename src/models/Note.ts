@@ -23,6 +23,7 @@ export interface Note extends Document {
   deletedDate: Date;
   created: Date;
   url: LinkData;
+  expirationDate: Date;
 }
 
 const NoteSchema: Schema = new Schema({
@@ -35,6 +36,7 @@ const NoteSchema: Schema = new Schema({
   archived: { type: Boolean, default: false },
   deleted: { type: Boolean, default: false },
   deletedDate: { type: Date, required: false },
+  expirationDate: { type: Date, required: false },
   url: {
     type: {
       url: { type: String },
