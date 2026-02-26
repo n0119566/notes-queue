@@ -20,42 +20,67 @@ export const cleanupDeletedNotesJob = async (job: Job): Promise<void> => {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - MAX_DELETION_DAYS);
 
     // Find notes that are marked as deleted and older than 30 days
-    const vectorsToDelete = await Note.find({
+    const notesToDelete = await Note.find({
       deleted: true,
       $or: [
         { deletedDate: { $lt: thirtyDaysAgo } }, // If date is greater than 30 days ago
         { deletedDate: { $exists: false } }, // OR if the field is missing entirely
       ],
-    }).select("_id");
+    }).select("_id user");
 
-    if (vectorsToDelete.length === 0) {
+    if (notesToDelete.length === 0) {
       console.log(`✅ [${jobName}] No old deleted notes found to clean up.`);
       return;
     }
+
+    console.log(`✅ [${jobName}] Found ${notesToDelete.length} old deleted notes to clean up.`);
+
+    // Group notes by user
+    const notesByUser = notesToDelete.reduce(
+      (acc, note) => {
+        const user = note.user;
+        if (!acc[user]) {
+          acc[user] = [];
+        }
+        acc[user].push(note._id.toString());
+        return acc;
+      },
+      {} as Record<string, string[]>,
+    );
+
+    // Convert to array format: [{name: user, ids: [ids]}]
+    const groupedNotes = Object.entries(notesByUser).map(([name, ids]) => ({
+      name,
+      ids,
+    }));
 
     const pc = new Pinecone({
       apiKey: process.env.PINECONE_API_KEY || "",
     });
 
-    const ids = vectorsToDelete.map((note) => note._id.toString());
-
     const indexName = process.env.PINECONE_INDEX_NAME || "notes";
-    const index = pc.index({ name: indexName });
 
-    if (ids.length <= 1000) {
-      await index.deleteMany(ids);
-    } else {
-      const result: string[][] = [];
-      for (let i = 0; i < ids.length; i += 1000) {
-        const chunk = ids.slice(i, i + 1000);
-        result.push(chunk);
+    // Delete vectors for each user using their namespace
+    for (const userGroup of groupedNotes) {
+      const index = pc.index(indexName).namespace(userGroup.name);
+
+      if (userGroup.ids.length <= 1000) {
+        await index.deleteMany(userGroup.ids);
+      } else {
+        const chunks: string[][] = [];
+        for (let i = 0; i < userGroup.ids.length; i += 1000) {
+          const chunk = userGroup.ids.slice(i, i + 1000);
+          chunks.push(chunk);
+        }
+
+        await Promise.all(
+          chunks.map(async (chunk) => {
+            await index.deleteMany(chunk);
+          }),
+        );
       }
 
-      await Promise.all(
-        result.map(async (chunk) => {
-          await index.deleteMany(chunk);
-        }),
-      );
+      console.log(`✅ [${jobName}] Deleted ${userGroup.ids.length} vectors for user: ${userGroup.name}`);
     }
 
     // Find and delete notes that are marked as deleted and older than 30 days
