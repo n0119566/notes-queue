@@ -1,8 +1,15 @@
 import Agenda, { Job } from "agenda";
 import { getMongoConnectionString } from "./config/database";
 import { cleanupDeletedNotesJob } from "./jobs/cleanupDeletedNotes";
-import { CLEANUP_DELETED_NOTES_JOB, CLEANUP_EXPIRED_NOTES_JOB, CLEANUP_JOB_FREQUENCY } from "./variables";
+import {
+  BACKUP_DATABASE_JOB,
+  BACKUP_JOB_FREQUENCY,
+  CLEANUP_DELETED_NOTES_JOB,
+  CLEANUP_EXPIRED_NOTES_JOB,
+  CLEANUP_JOB_FREQUENCY,
+} from "./variables";
 import { cleanupExpiredNotesJob } from "./jobs/cleanupExpiredNotes";
+import { backupDatabaseJob } from "./jobs/backupDatabase";
 
 let agenda: Agenda;
 
@@ -29,7 +36,15 @@ export const initAgenda = async (): Promise<Agenda> => {
     try {
       await cleanupExpiredNotesJob(job);
     } catch (error) {
-      console.error("Error in check and update job:", error);
+      console.error("Error in cleanup expired notes job:", error);
+    }
+  });
+
+  agenda.define(BACKUP_DATABASE_JOB, async (job: Job) => {
+    try {
+      await backupDatabaseJob(job);
+    } catch (error) {
+      console.error("Error in backup database job:", error);
     }
   });
 
@@ -66,6 +81,9 @@ export const startAgenda = async (): Promise<void> => {
 
   await agenda.every(CLEANUP_JOB_FREQUENCY, CLEANUP_EXPIRED_NOTES_JOB);
   console.log(`⏰ Scheduled ${CLEANUP_EXPIRED_NOTES_JOB} to run every ${CLEANUP_JOB_FREQUENCY}`);
+
+  await agenda.every(BACKUP_JOB_FREQUENCY, BACKUP_DATABASE_JOB);
+  console.log(`⏰ Scheduled ${BACKUP_DATABASE_JOB} to run every ${BACKUP_JOB_FREQUENCY}`);
 };
 
 export const stopAgenda = async (): Promise<void> => {
