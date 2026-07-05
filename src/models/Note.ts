@@ -10,6 +10,10 @@ export interface LinkData {
   description?: string;
 }
 
+export interface Picture {
+  id: string;
+}
+
 export interface Note extends Document {
   user: string;
   title: string;
@@ -24,6 +28,7 @@ export interface Note extends Document {
   created: Date;
   url: LinkData;
   expirationDate: Date;
+  pictures: Picture[];
 }
 
 const NoteSchema: Schema = new Schema({
@@ -37,6 +42,15 @@ const NoteSchema: Schema = new Schema({
   deleted: { type: Boolean, default: false },
   deletedDate: { type: Date, required: false },
   expirationDate: { type: Date, required: false },
+  pictures: {
+    type: [
+      {
+        id: { type: String, required: true },
+      },
+    ],
+    default: [],
+    required: false,
+  },
   url: {
     type: {
       url: { type: String },

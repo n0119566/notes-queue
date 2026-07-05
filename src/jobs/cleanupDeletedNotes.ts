@@ -1,7 +1,8 @@
 import { Job } from "agenda";
-import Note from "../models/Note";
+import Note, { Picture } from "../models/Note";
 import { MAX_DELETION_DAYS } from "../variables";
 import { Pinecone } from "@pinecone-database/pinecone/dist/pinecone";
+import { deleteImages } from "../handlers/cloudflareHandler";
 
 /**
  * Job: cleanup-deleted-notes
@@ -26,7 +27,7 @@ export const cleanupDeletedNotesJob = async (job: Job): Promise<void> => {
         { deletedDate: { $lt: thirtyDaysAgo } }, // If date is greater than 30 days ago
         { deletedDate: { $exists: false } }, // OR if the field is missing entirely
       ],
-    }).select("_id user");
+    }).select("_id user pictures");
 
     if (notesToDelete.length === 0) {
       console.log(`✅ [${jobName}] No old deleted notes found to clean up.`);
@@ -81,6 +82,19 @@ export const cleanupDeletedNotesJob = async (job: Job): Promise<void> => {
       }
 
       console.log(`✅ [${jobName}] Deleted ${userGroup.ids.length} vectors for user: ${userGroup.name}`);
+    }
+
+    // Delete the Cloudflare images belonging to the notes being removed.
+    const pictureIds = notesToDelete.reduce<string[]>((acc, note) => {
+      if (Array.isArray(note.pictures)) {
+        acc.push(...note.pictures.map((picture: Picture) => picture.id).filter(Boolean));
+      }
+      return acc;
+    }, []);
+
+    if (pictureIds.length > 0) {
+      await deleteImages(pictureIds);
+      console.log(`✅ [${jobName}] Requested deletion of ${pictureIds.length} images from Cloudflare`);
     }
 
     // Find and delete notes that are marked as deleted and older than 30 days
