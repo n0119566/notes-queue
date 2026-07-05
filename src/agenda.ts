@@ -76,14 +76,26 @@ export const startAgenda = async (): Promise<void> => {
   await agenda.start();
   console.log("🚀 Agenda started");
 
-  await agenda.every(CLEANUP_JOB_FREQUENCY, CLEANUP_DELETED_NOTES_JOB);
-  console.log(`⏰ Scheduled ${CLEANUP_DELETED_NOTES_JOB} to run every ${CLEANUP_JOB_FREQUENCY}`);
+  const now = Date.now();
+  const SECOND = 1000;
 
-  await agenda.every(CLEANUP_JOB_FREQUENCY, CLEANUP_EXPIRED_NOTES_JOB);
-  console.log(`⏰ Scheduled ${CLEANUP_EXPIRED_NOTES_JOB} to run every ${CLEANUP_JOB_FREQUENCY}`);
+  // Stagger the first run so the jobs kick off in order: backup, then expired,
+  // then deleted — starting 1 minute after Agenda starts and 30 seconds apart.
+  // Each job still repeats on its configured interval after this first run.
+  const startupSchedule: Array<{ name: string; interval: string; firstRunAt: Date }> = [
+    { name: BACKUP_DATABASE_JOB, interval: BACKUP_JOB_FREQUENCY, firstRunAt: new Date(now + 60 * SECOND) },
+    { name: CLEANUP_EXPIRED_NOTES_JOB, interval: CLEANUP_JOB_FREQUENCY, firstRunAt: new Date(now + 90 * SECOND) },
+    { name: CLEANUP_DELETED_NOTES_JOB, interval: CLEANUP_JOB_FREQUENCY, firstRunAt: new Date(now + 120 * SECOND) },
+  ];
 
-  await agenda.every(BACKUP_JOB_FREQUENCY, BACKUP_DATABASE_JOB);
-  console.log(`⏰ Scheduled ${BACKUP_DATABASE_JOB} to run every ${BACKUP_JOB_FREQUENCY}`);
+  for (const { name, interval, firstRunAt } of startupSchedule) {
+    const job = await agenda.every(interval, name);
+    job.schedule(firstRunAt);
+    await job.save();
+    console.log(
+      `⏰ Scheduled ${name} to first run at ${firstRunAt.toISOString()}, then every ${interval}`
+    );
+  }
 };
 
 export const stopAgenda = async (): Promise<void> => {
